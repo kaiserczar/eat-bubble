@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Pop Camera Game</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <video id="camera-feed" autoplay playsinline></video>
+        <canvas id="game-canvas"></canvas>
+        <div id="loading-overlay">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Loading face tracking...</p>
+            </div>
+        </div>
+        <div id="error-overlay" class="hidden">
+            <div class="error-content">
+                <p id="error-message"></p>
+                <button id="retry-btn">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+    <!-- Game Scripts -->
+    <script src="js/bubble.js"></script>
+    <script src="js/faceTracking.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/collision.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
