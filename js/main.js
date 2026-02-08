@@ -23,6 +23,12 @@ class Game {
         // Debug mode - set to true to see tracking visualization
         this.debugMode = false;
 
+        // Score tracking
+        this.totalPopped = 0;
+        this.popTimestamps = [];
+        this.scoreTotal = document.getElementById('score-total');
+        this.scoreRate = document.getElementById('score-rate');
+
         // Video to canvas coordinate mapping (for object-fit: cover)
         this.videoTransform = { scale: 1, offsetX: 0, offsetY: 0 };
 
@@ -47,6 +53,12 @@ class Game {
                 this.debugMode = !this.debugMode;
                 console.log('Debug mode:', this.debugMode);
             }
+        });
+
+        // Tap/click to toggle debug mode
+        this.canvas.addEventListener('click', () => {
+            this.debugMode = !this.debugMode;
+            console.log('Debug mode:', this.debugMode);
         });
     }
 
@@ -200,6 +212,11 @@ class Game {
 
             if (collisions.length > 0) {
                 this.collisionDetector.applyCollisions(collisions);
+                this.totalPopped += collisions.length;
+                const now = performance.now();
+                for (let i = 0; i < collisions.length; i++) {
+                    this.popTimestamps.push(now);
+                }
             }
         }
     }
@@ -215,6 +232,22 @@ class Game {
         if (this.debugMode) {
             this.drawDebugOverlay();
         }
+
+        // Update score display
+        this.updateScoreDisplay();
+    }
+
+    updateScoreDisplay() {
+        this.scoreTotal.textContent = this.totalPopped + (this.totalPopped === 1 ? ' bubble' : ' bubbles');
+
+        // Calculate rate from pops in the last 60 seconds
+        const now = performance.now();
+        const windowMs = 60000;
+        while (this.popTimestamps.length > 0 && now - this.popTimestamps[0] > windowMs) {
+            this.popTimestamps.shift();
+        }
+        const rate = this.popTimestamps.length; // pops in last 60s = pops/min
+        this.scoreRate.textContent = rate.toFixed(1) + '/min';
     }
 
     drawDebugOverlay() {
