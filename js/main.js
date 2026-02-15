@@ -309,7 +309,7 @@ class Game {
             ctx.save();
             ctx.translate(popup.x, popup.y);
             ctx.rotate(popup.rotation);
-            ctx.scale(popup.scale, popup.scale);
+            ctx.scale(-popup.scale, popup.scale); // Negative X to counter CSS scaleX(-1) mirror
             ctx.globalAlpha = Math.max(0, popup.alpha);
 
             // Draw starburst shape (yellow)

@@ -224,13 +224,13 @@ class Bubble {
 
         if (isPoison) {
             // Wavy, distorted edge path for poison bubbles
-            const segments = 40;
-            const distortAmount = r * 0.08;
+            const segments = 60;
+            const distortAmount = r * 0.06;
             ctx.beginPath();
             for (let i = 0; i <= segments; i++) {
                 const angle = (Math.PI * 2 * i) / segments;
-                const distort = Math.sin(angle * 5 + this.wobbleOffset * 3) * distortAmount
-                              + Math.sin(angle * 3 - this.wobbleOffset * 2) * distortAmount * 0.6;
+                const distort = Math.sin(angle * 9 + this.wobbleOffset * 1.2) * distortAmount
+                              + Math.sin(angle * 6 - this.wobbleOffset * 0.8) * distortAmount * 0.6;
                 const pr = r + distort;
                 const px = x + Math.cos(angle) * pr;
                 const py = y + Math.sin(angle) * pr;
