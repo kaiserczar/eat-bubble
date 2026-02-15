@@ -2,20 +2,28 @@
  * Bubble class - handles individual bubble state, physics, and rendering
  */
 class Bubble {
-    constructor(x, y, radius, velocityX, velocityY) {
+    constructor(x, y, radius, velocityX, velocityY, type = 'normal') {
         this.x = x;
         this.y = y;
         this.radius = radius;
         this.velocityX = velocityX;
         this.velocityY = velocityY;
+        this.type = type;
         this.alive = true;
         this.popping = false;
         this.popProgress = 0;
         this.popParticles = [];
 
-        // Visual properties for realistic bubble look
-        this.hue = Math.random() * 360;
-        this.saturation = 85 + Math.random() * 15; // 85-100% saturation for vibrancy
+        // Visual properties
+        if (this.type === 'poison') {
+            this.hue = 90 + Math.random() * 30; // Sickly green (90-120)
+            this.saturation = 70 + Math.random() * 20;
+            this.trailParticles = [];
+            this.trailSpawnTimer = 0;
+        } else {
+            this.hue = Math.random() * 360;
+            this.saturation = 85 + Math.random() * 15; // 85-100% saturation for vibrancy
+        }
         this.wobbleOffset = Math.random() * Math.PI * 2;
         this.wobbleSpeed = 0.02 + Math.random() * 0.02;
     }
@@ -45,6 +53,30 @@ class Bubble {
 
         // Update wobble
         this.wobbleOffset += this.wobbleSpeed * deltaTime;
+
+        // Update poison gas trail
+        if (this.type === 'poison') {
+            this.trailSpawnTimer -= deltaTime;
+            if (this.trailSpawnTimer <= 0) {
+                this.trailSpawnTimer = 60 + Math.random() * 40; // Spawn every 60-100ms
+                this.trailParticles.push({
+                    x: this.x + (Math.random() - 0.5) * this.radius * 0.8,
+                    y: this.y + (Math.random() - 0.5) * this.radius * 0.8,
+                    vx: (Math.random() - 0.5) * 0.02,
+                    vy: -0.01 - Math.random() * 0.02, // Drift upward
+                    size: 2 + Math.random() * 3,
+                    life: 1,
+                    hue: 90 + Math.random() * 40
+                });
+            }
+            for (const p of this.trailParticles) {
+                p.x += p.vx * deltaTime;
+                p.y += p.vy * deltaTime;
+                p.life -= deltaTime * 0.002;
+                p.size *= 0.999;
+            }
+            this.trailParticles = this.trailParticles.filter(p => p.life > 0);
+        }
 
         // Remove if completely off screen (with buffer)
         const buffer = this.radius * 2;
@@ -77,7 +109,9 @@ class Bubble {
                 size: size,
                 life: 1,
                 scale: 1,
-                hue: this.hue + (Math.random() - 0.5) * 40
+                hue: this.type === 'poison'
+                    ? 90 + Math.random() * 40  // Green range for poison
+                    : this.hue + (Math.random() - 0.5) * 40
             });
         }
     }
@@ -150,6 +184,17 @@ class Bubble {
                 }
             }
         } else {
+            // Draw poison gas trail behind bubble
+            if (this.type === 'poison' && this.trailParticles) {
+                for (const p of this.trailParticles) {
+                    const alpha = p.life * 0.4;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsla(${p.hue}, 60%, 50%, ${alpha})`;
+                    ctx.fill();
+                }
+            }
+
             // Normal bubble with slight wobble
             const wobbleX = Math.sin(this.wobbleOffset) * 2;
             const wobbleY = Math.cos(this.wobbleOffset * 0.7) * 2;
@@ -161,22 +206,47 @@ class Bubble {
 
     drawBubbleShape(ctx, x, y) {
         const r = this.radius;
+        const isPoison = this.type === 'poison';
 
-        // Main bubble body - translucent with gradient (more vibrant)
+        // Opacity: poison bubbles are more opaque
+        const baseAlpha = isPoison ? 0.65 : 0.5;
+        const midAlpha = isPoison ? 0.5 : 0.35;
+        const edgeAlpha = isPoison ? 0.35 : 0.2;
+
+        // Main bubble body - translucent with gradient
         const gradient = ctx.createRadialGradient(
             x - r * 0.3, y - r * 0.3, 0,
             x, y, r
         );
-        gradient.addColorStop(0, `hsla(${this.hue}, ${this.saturation}%, 85%, 0.5)`);
-        gradient.addColorStop(0.5, `hsla(${this.hue}, ${this.saturation - 5}%, 65%, 0.35)`);
-        gradient.addColorStop(1, `hsla(${this.hue}, ${this.saturation - 10}%, 50%, 0.2)`);
+        gradient.addColorStop(0, `hsla(${this.hue}, ${this.saturation}%, 85%, ${baseAlpha})`);
+        gradient.addColorStop(0.5, `hsla(${this.hue}, ${this.saturation - 5}%, 65%, ${midAlpha})`);
+        gradient.addColorStop(1, `hsla(${this.hue}, ${this.saturation - 10}%, 50%, ${edgeAlpha})`);
 
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (isPoison) {
+            // Wavy, distorted edge path for poison bubbles
+            const segments = 40;
+            const distortAmount = r * 0.08;
+            ctx.beginPath();
+            for (let i = 0; i <= segments; i++) {
+                const angle = (Math.PI * 2 * i) / segments;
+                const distort = Math.sin(angle * 5 + this.wobbleOffset * 3) * distortAmount
+                              + Math.sin(angle * 3 - this.wobbleOffset * 2) * distortAmount * 0.6;
+                const pr = r + distort;
+                const px = x + Math.cos(angle) * pr;
+                const py = y + Math.sin(angle) * pr;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        } else {
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+        }
+
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Bubble outline (more vibrant)
+        // Bubble outline
         ctx.strokeStyle = `hsla(${this.hue}, ${this.saturation}%, 65%, 0.7)`;
         ctx.lineWidth = 2.5;
         ctx.stroke();
@@ -186,8 +256,13 @@ class Bubble {
             x - r * 0.4, y - r * 0.4, 0,
             x - r * 0.4, y - r * 0.4, r * 0.4
         );
-        highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-        highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        if (isPoison) {
+            highlightGradient.addColorStop(0, 'rgba(200, 255, 200, 0.5)');
+            highlightGradient.addColorStop(1, 'rgba(200, 255, 200, 0)');
+        } else {
+            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        }
 
         ctx.beginPath();
         ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2);
@@ -197,24 +272,26 @@ class Bubble {
         // Small secondary highlight
         ctx.beginPath();
         ctx.arc(x + r * 0.3, y + r * 0.2, r * 0.1, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillStyle = isPoison ? 'rgba(200, 255, 200, 0.3)' : 'rgba(255, 255, 255, 0.4)';
         ctx.fill();
 
-        // Rainbow sheen effect (more visible)
-        const sheenGradient = ctx.createLinearGradient(
-            x - r, y - r, x + r, y + r
-        );
-        sheenGradient.addColorStop(0, 'rgba(255, 0, 0, 0.1)');
-        sheenGradient.addColorStop(0.2, 'rgba(255, 165, 0, 0.1)');
-        sheenGradient.addColorStop(0.4, 'rgba(255, 255, 0, 0.1)');
-        sheenGradient.addColorStop(0.6, 'rgba(0, 255, 0, 0.1)');
-        sheenGradient.addColorStop(0.8, 'rgba(0, 0, 255, 0.1)');
-        sheenGradient.addColorStop(1, 'rgba(128, 0, 128, 0.1)');
+        // Rainbow sheen effect (normal bubbles only)
+        if (!isPoison) {
+            const sheenGradient = ctx.createLinearGradient(
+                x - r, y - r, x + r, y + r
+            );
+            sheenGradient.addColorStop(0, 'rgba(255, 0, 0, 0.1)');
+            sheenGradient.addColorStop(0.2, 'rgba(255, 165, 0, 0.1)');
+            sheenGradient.addColorStop(0.4, 'rgba(255, 255, 0, 0.1)');
+            sheenGradient.addColorStop(0.6, 'rgba(0, 255, 0, 0.1)');
+            sheenGradient.addColorStop(0.8, 'rgba(0, 0, 255, 0.1)');
+            sheenGradient.addColorStop(1, 'rgba(128, 0, 128, 0.1)');
 
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = sheenGradient;
-        ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = sheenGradient;
+            ctx.fill();
+        }
     }
 }
 
@@ -275,7 +352,8 @@ class BubbleManager {
                 break;
         }
 
-        this.bubbles.push(new Bubble(x, y, radius, velocityX, velocityY));
+        const type = Math.random() < 0.125 ? 'poison' : 'normal';
+        this.bubbles.push(new Bubble(x, y, radius, velocityX, velocityY, type));
     }
 
     update(deltaTime) {

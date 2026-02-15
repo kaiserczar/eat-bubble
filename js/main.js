@@ -24,10 +24,14 @@ class Game {
         this.debugMode = false;
 
         // Score tracking
+        this.score = 0;
         this.totalPopped = 0;
         this.popTimestamps = [];
         this.scoreTotal = document.getElementById('score-total');
         this.scoreRate = document.getElementById('score-rate');
+
+        // Comic pop-up animations (Batman-style "YUK!")
+        this.popups = [];
 
         // Video to canvas coordinate mapping (for object-fit: cover)
         this.videoTransform = { scale: 1, offsetX: 0, offsetY: 0 };
@@ -212,13 +216,41 @@ class Game {
 
             if (collisions.length > 0) {
                 this.collisionDetector.applyCollisions(collisions);
-                this.totalPopped += collisions.length;
                 const now = performance.now();
-                for (let i = 0; i < collisions.length; i++) {
-                    this.popTimestamps.push(now);
+                for (const collision of collisions) {
+                    if (collision.bubbleType === 'poison') {
+                        this.score -= 1;
+                        this.spawnYukPopup(collision.bubble.x, collision.bubble.y);
+                    } else {
+                        this.score += 1;
+                        this.totalPopped += 1;
+                        this.popTimestamps.push(now);
+                    }
                 }
             }
         }
+
+        // Update comic popups
+        for (const popup of this.popups) {
+            popup.age += deltaTime;
+            if (popup.age < popup.growDuration) {
+                // Growing phase: scale up to 1.2
+                popup.scale = (popup.age / popup.growDuration) * 1.2;
+            } else if (popup.age < popup.growDuration + popup.holdDuration) {
+                // Hold phase: settle to 1.0
+                const holdProgress = (popup.age - popup.growDuration) / popup.holdDuration;
+                popup.scale = 1.2 - holdProgress * 0.2;
+            } else {
+                // Fade phase
+                const fadeProgress = (popup.age - popup.growDuration - popup.holdDuration) / popup.fadeDuration;
+                popup.scale = 1.0 - fadeProgress * 0.3;
+                popup.alpha = 1 - fadeProgress;
+            }
+            if (popup.age >= popup.totalDuration) {
+                popup.alive = false;
+            }
+        }
+        this.popups = this.popups.filter(p => p.alive);
     }
 
     render() {
@@ -227,6 +259,9 @@ class Game {
 
         // Draw bubbles
         this.bubbleManager.draw(this.ctx);
+
+        // Draw comic popups on top
+        this.drawPopups();
 
         // Debug: Draw face tracking overlay
         if (this.debugMode) {
@@ -238,7 +273,7 @@ class Game {
     }
 
     updateScoreDisplay() {
-        this.scoreTotal.textContent = this.totalPopped + (this.totalPopped === 1 ? ' bubble' : ' bubbles');
+        this.scoreTotal.textContent = this.score + (Math.abs(this.score) === 1 ? ' point' : ' points');
 
         // Calculate rate from pops in the last 60 seconds
         const now = performance.now();
@@ -248,6 +283,76 @@ class Game {
         }
         const rate = this.popTimestamps.length; // pops in last 60s = pops/min
         this.scoreRate.textContent = rate.toFixed(1) + '/min';
+    }
+
+    spawnYukPopup(x, y) {
+        this.popups.push({
+            x: x,
+            y: y,
+            scale: 0,
+            alpha: 1,
+            age: 0,
+            growDuration: 150,
+            holdDuration: 200,
+            fadeDuration: 400,
+            totalDuration: 750,
+            rotation: (Math.random() - 0.5) * 0.4, // Slight random tilt
+            alive: true
+        });
+    }
+
+    drawPopups() {
+        const ctx = this.ctx;
+        for (const popup of this.popups) {
+            if (popup.scale <= 0) continue;
+
+            ctx.save();
+            ctx.translate(popup.x, popup.y);
+            ctx.rotate(popup.rotation);
+            ctx.scale(popup.scale, popup.scale);
+            ctx.globalAlpha = Math.max(0, popup.alpha);
+
+            // Draw starburst shape (yellow)
+            const spikes = 12;
+            const outerRadius = 70;
+            const innerRadius = 45;
+
+            ctx.beginPath();
+            for (let i = 0; i < spikes * 2; i++) {
+                const angle = (Math.PI * 2 * i) / (spikes * 2) - Math.PI / 2;
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const px = Math.cos(angle) * radius;
+                const py = Math.sin(angle) * radius;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+
+            // Yellow fill with dark outline
+            ctx.fillStyle = '#FFD700';
+            ctx.fill();
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw "YUK!" text
+            ctx.font = 'bold 36px "Comic Sans MS", "Bangers", Impact, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Black outline for text
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 4;
+            ctx.lineJoin = 'round';
+            ctx.strokeText('YUK!', 0, 0);
+
+            // Green fill for text
+            ctx.fillStyle = '#2d8c2d';
+            ctx.fillText('YUK!', 0, 0);
+
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
     }
 
     drawDebugOverlay() {
