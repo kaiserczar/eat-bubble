@@ -47,6 +47,7 @@ class CollisionDetector {
                 if (distance < collisionDistance) {
                     collisions.push({
                         bubble: bubble,
+                        bubbleType: bubble.type,
                         face: face,
                         mouthCenter: mouthPos,
                         mouthOpenness: mouth.openness,
